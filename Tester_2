@@ -1,0 +1,105 @@
+import os
+import csv
+import subprocess
+import imghdr
+
+import cv2
+import pandas as pd
+
+from sklearn.cluster import MiniBatchKMeans
+from skimage.metrics import structural_similarity as ssim
+
+
+# quantize image to reduce colour data for easy raster to vector conversion
+def quantize_image(image: object, number_of_colors: object) -> object:
+    (h, w) = image.shape[:2]
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+    image = image.reshape((image.shape[0] * image.shape[1], 3))
+    clt = MiniBatchKMeans(n_clusters=int(number_of_colors))
+    labels = clt.fit_predict(image)
+    quantized_image = clt.cluster_centers_.astype("uint8")[labels]
+    quantized_image = quantized_image.reshape((h, w, 3))
+    quantized_image = cv2.cvtColor(quantized_image, cv2.COLOR_LAB2BGR)
+    # return resized image
+    return quantized_image
+
+
+def save_image_to_path(path: str, image: object) -> object:
+    cv2.imwrite(path, image)
+
+
+def convert_to_png(in_path: str, out_path: str):
+    subprocess.call(["svg2png.bat", in_path, out_path])
+
+
+# resize Image
+def image_resize(image_to_resize: object, set_width: int):
+    width = int(image_to_resize.shape[1] * set_width / image_to_resize.shape[1])
+    height = int(image_to_resize.shape[0] * set_width / image_to_resize.shape[1])
+    dimensions = (width, height)
+    return cv2.resize(image_to_resize, dimensions, interpolation=cv2.INTER_AREA)
+
+
+def check_similarity(path_1: str, path_2: str, image_size):
+    img1 = cv2.imread(path_1)
+    try:
+        img2 = image_resize(cv2.imread(path_2), image_size)
+    except Exception as e:
+        return 0
+
+    w1, h1 = img2.shape[:-1]
+    img1 = cv2.resize(img1, (h1, w1))
+
+    s = ssim(img1, img2, multichannel=True)
+    return str(s * 100)
+
+
+# for folder in os.listdir("evaluation"):
+#     for img in os.listdir(os.path.join("evaluation", folder)):
+#         if img != "png" and img != "svg":
+#
+#             path = str(os.path.join("evaluation", folder, img))
+#             image = cv2.imread(path)
+#             image = quantize_image(image, int(2))
+#
+#             image_extension = imghdr.what(path)
+#
+#             temp_path = os.path.join("evaluation", "temp", "temp."+image_extension)
+#             save_image_to_path(temp_path, image)
+#
+#             subprocess.call([
+#                 'java', '-jar', 'libraries/imageTrace.jar', temp_path,
+#                 'outfilename', os.path.join("evaluation", folder, "svg", img.split(".")[0]+".SVG"),
+#             ])
+#
+#             print(img)
+
+# for folder in os.listdir("evaluation"):
+#     if folder!="temp":
+#         for svg in os.listdir(os.path.join("evaluation", folder, "svg")):
+#             convert_to_png("../../../" +os.path.join("evaluation", folder, "svg", svg), "../../../"
+#             +os.path.join("evaluation", folder, "png", svg.split(".")[0] + ".png"))
+#             print(svg)
+
+
+with open('test_results_2.csv', 'w', newline='') as f:
+    thewriter = csv.writer(f)
+
+    index = 0
+
+    thewriter.writerow(["index", "image name", "similarity"])
+    for folder in os.listdir("evaluation"):
+        if folder != "temp":
+            for img in os.listdir(os.path.join("evaluation", folder)):
+                if img!="png" and img!="svg":
+                    index+=1
+                    try:
+                        si = check_similarity(os.path.join("evaluation", folder, img)
+                                              , os.path.join("evaluation", folder, "png", img.split(".")[0]+".png")
+                                              , 300)
+
+                        thewriter.writerow([str(index), str(img), str(si)])
+                    except OSError as e:
+                        print(e)
+
+                    print("done!")

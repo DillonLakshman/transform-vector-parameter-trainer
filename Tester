@@ -1,0 +1,62 @@
+import os
+import csv
+import subprocess
+import imghdr
+
+import cv2
+from skimage.metrics import structural_similarity as ssim
+
+
+def convert_to_png(in_path: str, out_path: str):
+    subprocess.call(["svg2png.bat", in_path, out_path])
+
+
+# resize Image
+def image_resize(image_to_resize: object, set_width: int):
+    width = int(image_to_resize.shape[1] * set_width / image_to_resize.shape[1])
+    height = int(image_to_resize.shape[0] * set_width / image_to_resize.shape[1])
+    dimensions = (width, height)
+    return cv2.resize(image_to_resize, dimensions, interpolation=cv2.INTER_AREA)
+
+
+def check_similarity(path_1: str, path_2: str, image_size):
+    img1 = cv2.imread(path_1)
+    img2 = image_resize(cv2.imread(path_2), image_size)
+
+    w1, h1 = img2.shape[:-1]
+    img1 = cv2.resize(img1, (h1, w1))
+
+    s = ssim(img1, img2, multichannel=True)
+    return str(s * 100)
+
+for folder in os.listdir("Testing"):
+    for svg in os.listdir(os.path.join("Testing", folder, "svg")):
+        convert_to_png("../../../" +os.path.join("Testing", folder, "svg", svg), "../../../"
+        +os.path.join("Testing", folder, "png", svg.split(".")[0] + ".png"))
+        print(svg)
+
+
+for folder in os.listdir("Testing"):
+    for svg in os.listdir(os.path.join("Testing", folder, "svg")):
+        convert_to_png("../../../" +os.path.join("Testing", folder, "svg", svg), "../../../"
+        +os.path.join("Testing", folder, "png", svg.split(".")[0] + ".png"))
+        print(svg)
+
+
+with open('test_results.csv', 'w', newline='') as f:
+    thewriter = csv.writer(f)
+
+    index = 0
+
+    thewriter.writerow(["index", "image name", "similarity"])
+    for folder in os.listdir("Testing"):
+        for img in os.listdir(os.path.join("Testing", folder)):
+            if img!="png" and img!="svg":
+                index+=1
+                si = check_similarity(os.path.join("Testing", folder, img)
+                                      , os.path.join("Testing", folder, "png", img.split(".")[0]+".png")
+                                      , 300)
+
+                thewriter.writerow([str(index), str(img), str(si)])
+
+                print("done!")
